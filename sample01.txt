@@ -1,0 +1,97 @@
+@setlocal ENABLEEXTENSIONS ENABLEDELAYEDEXPANSION
+@echo off
+
+@REM *********************************************************
+@REM Set thes values as appropriate
+@REM *********************************************************
+
+@REM This is where your script is located
+if NOT DEFINED xRscript set xRscript=C:\Army\SourceCode\R\RscriptCallFromCommandLine\sample01.r
+
+@REM This is the function you want to run within your script and 
+@REM the arguments you want to pass to it.
+if NOT DEFINED xRfunctionAndArgs set xRfunctionAndArgs=Hello('world')
+
+@REM This is the folder where you want the logs from your scripts to 
+@REM be placed.  The name of the log file for each run is built from 
+@REM the name of your script; the name of your function and its 
+@REM parameters; and the data and time of the run.
+if NOT DEFINED xLogFolder set xLogFolder=C:\temp\r_logs
+
+@REM This is where the R program that runs R scripts resides.
+@REM It is named Rscript.exe and is in your R installation folder.
+if NOT DEFINED xRexe set xRexe=C:\Program Files\R\R-3.5.2\bin\x64\Rscript.exe
+
+@REM This is the Windows priority that the script will run at.
+if NOT DEFINED xPriority set xPriority=LOW
+
+@REM *********************************************************
+@REM You hopefully won't need to change anything below this
+@REM *********************************************************
+
+@if NOT EXIST "%xRscript%" @pause *** Could not find %xRscript%
+
+set xSfx=%xRscript:~-2%
+@if /I NOT "%xSfx%"==".R" @pause *** %xRscript% did not end in .r
+
+@if NOT EXIST "%xRexe%" @pause *** Rscript.exe not found
+
+@mkdir %xLogFolder% 1>NUL 2>NUL
+@if NOT EXIST "%xLogFolder%" @pause *** Could not create %xLogFolder%
+
+@REM Turn the date and time into YYYYMMDD_HHMMSShh
+@set xid=%DATE%
+@set xid=%xid:Sun =%
+@set xid=%xid:Mon =%
+@set xid=%xid:Tue =%
+@set xid=%xid:Wed =%
+@set xid=%xid:Thu =%
+@set xid=%xid:Fri =%
+@set xid=%xid:Sat =%
+@set xid=%xid:~6,4%%xid:~0,2%%xid:~3,2%_%TIME: =0%
+@set xid=%xid:/=%
+@set xid=%xid: =_%
+@set xid=%xid::=%
+@set xid=%xid:;=%
+@set xid=%xid:.=%
+@set xid=%xid:,=%
+
+@REM RScript.exe gets an exclusive lock on the script that it runs.  We 
+@REM want to support running multiple copies of the script with different 
+@REM parameters on each one.  To accomplish this we make a backup copy of 
+@REM the RScript and run that.  We give the backup copy a unique name 
+@REM using the %XID% value.  These backup copies will build up over time 
+@REM so we delete old ones that are no longer in use using the ERASE 
+@REM command.  The ERASE command will not be able to delete the backup 
+@REM copies that are currently running becuases they will be locked.
+@REM The code strips the .r off the end of the actual script and then 
+@REM uses that to build %xRscriptBu% which has the %xid% in it and 
+@REM xRscriptDel which has the file mask that will match all backup 
+@REM script names.
+set x=%xRscript%
+set xRscriptBase=%xRscript:.r=%
+set xRscriptBu=%xRscriptBase%_%xid%.r
+set xRscriptDel=%xRscriptBase%_*.r
+erase "%xRscriptDel%" /F /Q
+copy "%xRscript%" "%xRscriptBu%" /B /V
+if NOT EXIST "%xRscriptBu%" @pause *** Could not create %xRscriptBu%
+set x
+
+@REM Create a unique log file for this run
+set xLog=%xRscriptBase%_%xRfunctionAndArgs%_%xid%.log
+set xLog=%xLog::=_%
+set xLog=%xLog:\=_%
+set xLog=%xLog: =%
+set xLog=%xLog:'=%
+set xLog=%xLog:"=%
+set xLog=%xLog:(=_%
+set xLog=%xLog:)=_%
+set xLog=%xLog:,=_%
+set xLog=%xLogFolder%\%xLog%
+@echo Log file=%xlog%
+
+set xCmd="%xRexe%" "%xRscriptBu%" --RscriptRun="%xRfunctionAndArgs%" 1>"%xLog%" 2>&1
+@echo %xCmd%
+%xCmd%
+
+set xRfunctionAndArgs=
